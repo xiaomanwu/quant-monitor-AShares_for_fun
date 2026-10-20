@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量化信号监控台 · A股</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ========== 顶栏 ========== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">量</div>
+      <div class="brand-text">
+        <h1>量化交易终端</h1>
+        <span class="sub">A-Share Quant Terminal</span>
+      </div>
+    </div>
+
+    <nav class="main-nav">
+      <button class="nav-btn active" data-view="monitor">实时监控</button>
+      <button class="nav-btn" data-view="backtest">策略回测</button>
+      <button class="nav-btn" data-view="compare">策略对比</button>
+      <button class="nav-btn" data-view="factors">因子挖掘</button>
+      <button class="nav-btn" data-view="paper">模拟盘</button>
+    </nav>
+
+    <div class="index-strip" id="indexStrip"></div>
+
+    <div class="top-right">
+      <div class="session-badge" id="sessionBadge">
+        <span class="dot"></span><span id="sessionText">连接中</span>
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ==================== 视图 1：实时监控 ==================== -->
+  <main class="layout view" id="viewMonitor">
+
+    <!-- 左：自选股 -->
+    <section class="panel watch-panel">
+      <div class="panel-head">
+        <h2>自选监控 <span class="count" id="watchCount">0</span></h2>
+        <div class="search-wrap">
+          <input id="searchInput" type="text" placeholder="代码 / 名称，回车添加" autocomplete="off">
+          <div class="suggest" id="suggest"></div>
+        </div>
+      </div>
+      <div class="watch-list" id="watchList">
+        <div class="empty">加载中…</div>
+      </div>
+    </section>
+
+    <!-- 中：图表 + 明细 -->
+    <section class="panel chart-panel">
+      <div class="panel-head chart-head">
+        <div class="chart-title">
+          <h2 id="detailName">—</h2>
+          <span class="code" id="detailCode"></span>
+          <span class="score-pill" id="detailScore"></span>
+        </div>
+        <div class="range-tabs" id="rangeTabs">
+          <button data-scale="5" data-len="100">分时</button>
+          <button data-scale="30" data-len="120">30分</button>
+          <button data-scale="60" data-len="120">60分</button>
+          <button data-scale="240" data-len="120" class="active">日K</button>
+        </div>
+      </div>
+
+      <div class="chart-meta" id="chartMeta"></div>
+      <div class="chart-box">
+        <canvas id="klineCanvas"></canvas>
+      </div>
+      <div class="chart-box sub">
+        <canvas id="volCanvas"></canvas>
+      </div>
+
+      <div class="detail-stats" id="detailStats"></div>
+
+      <div class="signals-block">
+        <h3>当前信号 <span class="hint">规则引擎 · 日线级别</span></h3>
+        <div class="signal-chips" id="detailSignals"></div>
+      </div>
+    </section>
+
+    <!-- 右：信号流 + 异动 -->
+    <section class="panel feed-panel">
+      <div class="feed-tabs" id="feedTabs">
+        <button class="active" data-tab="feed">信号流</button>
+        <button data-tab="breadth">涨跌分布</button>
+        <button data-tab="sector">板块</button>
+        <button data-tab="rank">异动榜</button>
+      </div>
+
+      <div class="tab-body" id="tabFeed">
+        <div class="feed" id="signalFeed"><div class="empty">等待信号…</div></div>
+      </div>
+
+      <div class="tab-body hidden" id="tabBreadth">
+        <div class="breadth-summary" id="breadthSummary"></div>
+        <div class="breadth-chart" id="breadthChart"></div>
+      </div>
+
+      <div class="tab-body hidden" id="tabSector">
+        <div class="sector-summary" id="sectorSummary">正在汇总板块行情…</div>
+        <div class="sector-list" id="sectorList"></div>
+      </div>
+
+      <div class="tab-body hidden" id="tabRank">
+        <div class="rank-tabs">
+          <button class="active" data-asc="0">涨幅榜</button>
+          <button data-asc="1">跌幅榜</button>
+        </div>
+        <div class="rank-list" id="rankList"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== 视图 2：策略回测 ==================== -->
+  <main class="view hidden" id="viewBacktest">
+    <aside class="bt-config panel">
+      <div class="panel-head"><h2>回测配置</h2></div>
+      <div class="cfg-scroll">
+        <div class="cfg-group">
+          <label class="cfg-label">策略</label>
+          <div class="strategy-list" id="strategyList"></div>
+        </div>
+
+        <div class="cfg-group" id="paramGroup">
+          <label class="cfg-label">策略参数</label>
+          <div id="paramInputs"></div>
+        </div>
+
+        <div class="cfg-group">
+          <label class="cfg-label">股票池</label>
+          <select id="btUniverse" class="inp"></select>
+          <div class="universe-info" id="universeInfo"></div>
+        </div>
+
+        <div class="cfg-group">
+          <label class="cfg-label">区间与资金</label>
+          <div class="row2">
+            <div><span class="tip">开始</span><input type="date" id="btStart" class="inp" value="2023-01-01"></div>
+            <div><span class="tip">结束</span><input type="date" id="btEnd" class="inp" value="2026-10-19"></div>
+          </div>
+          <div class="row2" style="margin-top:8px">
+            <div><span class="tip">初始资金(万)</span><input type="number" id="btCash" class="inp" value="100" min="1"></div>
+            <div><span class="tip">选股数</span><input type="number" id="btTopN" class="inp" value="8" min="1" max="50"></div>
+          </div>
+        </div>
+
+        <div class="cfg-group">
+          <label class="cfg-label">交易规则</label>
+          <div class="row2">
+            <div><span class="tip">调仓周期(日)</span><input type="number" id="btRebal" class="inp" value="5" min="1"></div>
+            <div><span class="tip">权重方式</span>
+              <select id="btWeight" class="inp">
+                <option value="equal">等权</option>
+                <option value="score">按分数</option>
+                <option value="vol_inverse">波动率倒数</option>
+                <option value="risk_parity">风险平价</option>
+              </select>
+            </div>
+          </div>
+          <div class="row2" style="margin-top:8px">
+            <div><span class="tip">佣金(‱)</span><input type="number" id="btComm" class="inp" value="2.5" step="0.1"></div>
+            <div><span class="tip">滑点(%)</span><input type="number" id="btSlip" class="inp" value="0.1" step="0.05"></div>
+          </div>
+        </div>
+
+        <div class="cfg-group">
+          <label class="cfg-label">风险控制</label>
+          <div class="row2">
+            <div><span class="tip">单票上限(%)</span><input type="number" id="btMaxPos" class="inp" value="20"></div>
+            <div><span class="tip">个股止损(%)</span><input type="number" id="btStopLoss" class="inp" value="12"></div>
+          </div>
+          <div class="row2" style="margin-top:8px">
+            <div><span class="tip">移动止损(%)</span><input type="number" id="btTrail" class="inp" value="15"></div>
+            <div><span class="tip">回撤熔断(%)</span><input type="number" id="btDdStop" class="inp" value="20"></div>
+          </div>
+        </div>
+
+        <button class="run-btn" id="runBacktest">运行回测</button>
+        <div class="progress-bar hidden" id="btProgress"><div></div></div>
+      </div>
+    </aside>
+
+    <section class="bt-result" id="btResult">
+      <div class="bt-placeholder" id="btPlaceholder">
+        <div class="ph-icon">◫</div>
+        <h3>配置左侧参数，点击「运行回测」</h3>
+        <p>引擎按 T+1 成交、涨跌停不可成交、含佣金印花税滑点，无未来函数</p>
+      </div>
+
+      <div class="bt-content hidden" id="btContent">
+        <div class="metric-grid" id="metricGrid"></div>
+
+        <div class="panel chart-card">
+          <div class="card-head">
+            <h3>净值曲线</h3>
+            <div class="legend">
+              <span><i style="background:#4d8dff"></i>策略</span>
+              <span><i style="background:#8b93a7"></i>基准</span>
+              <span><i style="background:rgba(255,77,94,.45)"></i>回撤</span>
+            </div>
+          </div>
+          <canvas id="navChart"></canvas>
+        </div>
+
+        <div class="bt-bottom">
+          <div class="panel">
+            <div class="card-head"><h3>交易记录</h3><span class="mini" id="tradeCount"></span></div>
+            <div class="trade-table" id="tradeTable"></div>
+          </div>
+          <div class="panel">
+            <div class="card-head"><h3>期末持仓</h3></div>
+            <div class="holding-list" id="holdingList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== 视图 3：策略对比 ==================== -->
+  <main class="view hidden" id="viewCompare">
+    <section class="cmp-wrap">
+      <div class="cmp-head panel">
+        <div>
+          <h2>多策略横向对比</h2>
+          <p class="mini">同一股票池、同一区间、同一成本模型下批量回测，按年化收益排序</p>
+        </div>
+        <div class="cmp-actions">
+          <select id="cmpUniverse" class="inp" style="width:120px">
+            <option value="csi300">沪深300</option>
+            <option value="csi500">中证500</option>
+            <option value="all_a">全A股</option>
+          </select>
+          <input type="date" id="cmpStart" class="inp" value="2023-01-01" style="width:130px">
+          <button class="run-btn" id="runCompare" style="width:auto;padding:7px 18px;margin:0">开始对比</button>
+        </div>
+      </div>
+
+      <div class="panel chart-card" id="cmpChartCard" style="display:none">
+        <div class="card-head"><h3>净值曲线对比</h3><div class="legend" id="cmpLegend"></div></div>
+        <canvas id="cmpChart"></canvas>
+      </div>
+
+      <div class="cmp-table-wrap panel" id="cmpTableWrap" style="display:none">
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th>策略</th><th>类型</th><th class="r">总收益</th><th class="r">年化</th>
+              <th class="r">夏普</th><th class="r">最大回撤</th><th class="r">卡玛</th>
+              <th class="r">胜率</th><th class="r">交易数</th><th class="r">年换手</th>
+            </tr>
+          </thead>
+          <tbody id="cmpTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== 视图 4：量化因子挖掘 ==================== -->
+  <main class="view hidden" id="viewFactors">
+    <section class="factor-wrap">
+      <div class="panel factor-intro">
+        <div>
+          <h2>全市场技术因子挖掘</h2>
+          <p>基于近一年日线，评价因子与未来 5 个交易日收益的截面相关性和分组收益。</p>
+        </div>
+        <button class="run-btn" id="runFactors">开始挖掘</button>
+      </div>
+      <div class="factor-meta" id="factorMeta"></div>
+      <div class="factor-note" id="factorNote">
+        使用 20 日动量、5 日反转、20 日波动率、成交量活跃度和价格偏离均线五类技术因子。
+        使用现存 A 股样本及未复权收盘价，存在幸存者偏差和公司行为影响；IC/ICIR 和分组收益不代表未来表现或投资建议。
+      </div>
+      <div class="cmp-table-wrap panel factor-table-wrap">
+        <table class="cmp-table factor-table">
+          <thead>
+            <tr>
+              <th>因子</th><th>定义</th><th class="r">平均 IC</th><th class="r">ICIR</th>
+              <th class="r">正 IC 占比</th><th class="r">最高组收益</th>
+              <th class="r">最低组收益</th><th class="r">多空差</th><th class="r">样本数</th>
+            </tr>
+          </thead>
+          <tbody id="factorTableBody">
+            <tr><td colspan="9" class="factor-placeholder">点击“开始挖掘”分析全 A 股日线因子。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== 视图 5：模拟盘 ==================== -->
+  <main class="view hidden" id="viewPaper">
+    <section class="paper-wrap">
+      <div class="no-account panel" id="noAccount">
+        <h3>创建模拟盘账户</h3>
+        <p>纸上交易：不接券商、不动真金。策略每日生成信号并模拟成交，用于验证策略在真实时间轴上的表现。</p>
+        <div class="init-form">
+          <select id="paperStrategy" class="inp"></select>
+          <select id="paperUniverse" class="inp">
+            <option value="csi300">沪深300</option>
+            <option value="csi500">中证500</option>
+            <option value="all_a">全A股</option>
+            <option value="watchlist">我的自选</option>
+          </select>
+          <input type="number" id="paperCash" class="inp" value="100" placeholder="初始资金(万)">
+          <button class="run-btn" id="createPaper" style="margin:0;width:auto;padding:8px 20px">创建账户</button>
+        </div>
+      </div>
+
+      <div id="paperMain" class="hidden">
+        <div class="paper-top">
+          <div class="metric-grid" id="paperMetrics"></div>
+          <div class="paper-actions panel">
+            <div class="pa-head">
+              <div>
+                <div class="pa-name" id="paStrategy">—</div>
+                <div class="mini" id="paMeta">—</div>
+              </div>
+              <span class="status-pill" id="paStatus">—</span>
+            </div>
+            <div class="pa-btns">
+              <button class="run-btn" id="runPaper" style="margin:0">执行今日调仓</button>
+              <button class="ghost-btn" id="resetPaper">重置</button>
+            </div>
+            <div class="pa-log mini" id="paLog"></div>
+          </div>
+        </div>
+
+        <div class="paper-bottom">
+          <div class="panel">
+            <div class="card-head"><h3>当前持仓</h3><span class="mini" id="paPosCount"></span></div>
+            <div class="holding-list" id="paperPositions"></div>
+          </div>
+          <div class="panel">
+            <div class="card-head"><h3>成交流水</h3></div>
+            <div class="trade-table" id="paperTrades"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span id="footStatus">—</span>
+    <span class="sep">·</span>
+    <span>数据源 腾讯 / 新浪 · 约 5 秒刷新</span>
+    <span class="sep">·</span>
+    <span class="disclaimer">仅供研究学习，不构成投资建议</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/app.js"></script>
+<script src="/static/trading.js"></script>
+</body>
+</html>
